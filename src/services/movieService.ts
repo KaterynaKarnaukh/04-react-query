@@ -7,7 +7,10 @@ interface FetchMoviesResponse {
   total_pages: number;
 }
 
-export const fetchMovies = async (query: string): Promise<Movie[]> => {
+export const fetchMovies = async (
+  query: string,
+  page: number
+): Promise<FetchMoviesResponse> => {
   const token = import.meta.env.VITE_TMDB_TOKEN;
 
   const response = await axios.get<FetchMoviesResponse>(
@@ -17,13 +20,13 @@ export const fetchMovies = async (query: string): Promise<Movie[]> => {
         query,
         include_adult: false,
         language: "en-US",
-        page: 1,
+        page,
       },
       headers: {
         Authorization: `Bearer ${token}`,
       },
     }
   );
-
-  return response.data.results;
+ 
+  return response.data;
 };

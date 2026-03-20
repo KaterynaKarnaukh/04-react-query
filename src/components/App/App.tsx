@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect  } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 import type { Movie } from "../../types/movie";
+import ReactPaginate from "react-paginate";
 import { fetchMovies } from "../../services/movieService";
 import SearchBar from "../SearchBar/SearchBar";
 import MovieGrid from "../MovieGrid/MovieGrid";
@@ -10,27 +12,29 @@ import MovieModal from "../MovieModal/MovieModal";
 import styles from "./App.module.css";
 
 export default function App() {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [query, setQuery] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
 
-  const handleSearch = async (query: string) => {
-    setMovies([]);
-    setError(false);
-    setLoading(true);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["movies", query, page],
+    queryFn: () => fetchMovies(query, page),
+    enabled: query.length > 0,
+    placeholderData: (prev) => prev,
+  });
 
-    try {
-      const results = await fetchMovies(query);
-      if (results.length === 0) {
-        toast("No movies found for your request.", { icon: "🎬" });
-      }
-      setMovies(results);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
+   const movies = data?.results ?? [];
+  const totalPages = data?.total_pages ?? 0;
+
+  useEffect(() => {
+    if (data && movies.length === 0 && query) {
+      toast.error("No movies found for your request.");
     }
+  }, [data, movies.length, query]);
+ 
+  const handleSearch = (newQuery: string) => {
+    setQuery(newQuery);
+    setPage(1);
   };
 
   const handleSelectMovie = (movie: Movie) => {
@@ -41,25 +45,30 @@ export default function App() {
     setSelectedMovie(null);
   };
 
-  return (
-    <div className={styles.wrapper}>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#1a0a2e",
-            color: "#f0e6ff",
-            border: "1px solid rgba(159, 90, 253, 0.4)",
-            fontFamily: '"DM Sans", sans-serif',
-          },
-        }}
-      />
+    return (
+    <div className={styles.app}>
+      <Toaster position="top-right" />
       <SearchBar onSubmit={handleSearch} />
-      <main className={styles.main}>
-        {loading && <Loader />}
-        {error && <ErrorMessage />}
-        {!loading && !error && movies.length > 0 && (
+      <main>
+        {isLoading && <Loader />}
+        {isError && <ErrorMessage />}
+        {!isLoading && !isError && movies.length > 0 && (
           <MovieGrid movies={movies} onSelect={handleSelectMovie} />
+        )}
+        {totalPages > 1 && (
+          <ReactPaginate
+            pageCount={totalPages}
+            pageRangeDisplayed={5}
+            marginPagesDisplayed={1}
+            onPageChange={({ selected }: { selected: number }) =>
+              setPage(selected + 1)
+            }
+            forcePage={page - 1}
+            containerClassName={styles.pagination}
+            activeClassName={styles.active}
+            nextLabel="→"
+            previousLabel="←"
+          />
         )}
       </main>
       {selectedMovie && (
@@ -68,3 +77,4 @@ export default function App() {
     </div>
   );
 }
+ 
